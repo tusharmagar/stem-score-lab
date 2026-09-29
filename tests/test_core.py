@@ -110,3 +110,23 @@ def test_range_requests_and_private_files_not_in_download(server):
         assert 'upload' not in names and not any('.log' in n or '.git/' in n for n in names)
         assert mod.KEY.encode() not in archive.read('index.html')
         assert archive.read('data/clip.mp3')==b'0123456789'
+
+
+def test_cancel_stops_process_and_keeps_finished_inputs(server,monkeypatch):
+    import subprocess,sys,time
+    mod,client=server;job=upload_wav(server);p=mod.RUNS/job
+    real_popen=subprocess.Popen
+    # Exercise the real process-group cancellation and supervisor, without a GPU.
+    monkeypatch.setattr(mod.subprocess,'Popen',lambda *args,**kwargs:real_popen([sys.executable,'-c','import time; time.sleep(30)'],**kwargs))
+    m=mod.read_json(p/'manifest.json');m.update(status='queued',targets=[{'id':'bass','status':'ready'},{'id':'vocals','status':'queued'}])
+    write_json(p/'manifest.json',m)
+    with mod.LOCK:mod.launch(p)
+    worker=mod.WORKER
+    response=client.post(f'/api/jobs/{job}/cancel',headers={'X-Lab-Key':mod.KEY})
+    assert response.status_code==200
+    deadline=time.monotonic()+5
+    while mod.ACTIVE is not None and time.monotonic()<deadline:time.sleep(.03)
+    assert worker.poll() is not None
+    m=mod.read_json(p/'manifest.json')
+    assert m['status']=='cancelled'
+    assert [t['status'] for t in m['targets']]==['ready','cancelled']

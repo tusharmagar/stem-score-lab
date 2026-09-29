@@ -86,6 +86,14 @@ def summarize(folder, audio_path, duration, notation=None):
         sections=lab(p/'structure.lab',[float,float,str]),
         playback=read_json(p/'playback.json', {'tracks': [], 'measures': []}),
         tokens=[], parts=[], warnings=list(result.get('warnings', []))+list(result.get('diagnostics', [])))
+    data['rhythm'] = []
+    rhythm_path = p/'rhythm_events.lab'
+    if rhythm_path.exists():
+        for line in rhythm_path.read_text().splitlines():
+            if line.strip():
+                stamp, value = line.split('\t', 1)
+                import json
+                data['rhythm'].append([float(stamp), json.loads(value)])
     data['tempo'] = [[a[0], 60/(b[0]-a[0])] for a,b in zip(beats,beats[1:]) if b[0]>a[0]]
     # Read decoded tokens with window offsets; position is local to each window.
     window, stamp, start = 0, None, 0

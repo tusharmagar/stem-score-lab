@@ -30,7 +30,11 @@ ROOT = Path('/content/stem-score-lab')
 if not (ROOT / '.git').exists():
     subprocess.run(['git', 'clone', '--depth', '1',
         'https://github.com/tusharmagar/stem-score-lab.git', str(ROOT)], check=True)
-subprocess.run([sys.executable, str(ROOT / 'scripts/colab_setup.py')], check=True)
+setup = subprocess.Popen([sys.executable, '-u', str(ROOT / 'scripts/colab_setup.py')], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+for line in setup.stdout:
+    print(line, end='', flush=True)
+if setup.wait():
+    raise RuntimeError('Setup failed; see the output above.')
 ''')
 add('code','''# 2. Launch the player directly in this notebook.
 # Rerun this cell if the interface needs to be reopened; completed runs are retained

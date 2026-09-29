@@ -144,7 +144,7 @@ function renderScores(){
  state.scores=[];const tracks=state.session.targets.filter(t=>state.selected.has(t.id));$('selection-count').textContent=tracks.length+' inputs visible';
  $('score-stack').innerHTML=tracks.length?tracks.map(t=>{
   const d=state.analyses.get(t.id),color=COLORS[state.session.targets.indexOf(t)%COLORS.length];
-  return `<section class="panel score-card" data-track="${esc(t.id)}" style="--track:${color}"><div class="panel-head"><h2>${esc(t.label)}</h2><div><span class="badge" data-now="${esc(t.id)}">—</span> <button class="small-button" data-inspect="${esc(t.id)}" ${!d?'disabled':''}>Inspect ↗</button></div></div>${d?.warnings?.length?`<div class="score-warning">${esc(d.warnings[0])}</div>`:''}<div class="score-body">${d?.parts?.length?d.parts.map((part,i)=>`<div class="score-part"><div class="voice-label">${part.voice==='Vocal'?'Predicted vocal voice':'Predicted instrumental voice'}</div><div class="score-scroll"><div class="score" id="score-${esc(t.id)}-${i}"></div></div></div>`).join(''):`<div class="score-empty">${esc(t.error||(d?.notes?.length?'No synchronized staff could be built. Raw notes and exports are available under Inspect.':t.status==='queued'||t.status==='running'?'Waiting for this transcription…':'No melody score was emitted for this input.'))}</div>`}</div>${d?.warnings?.length>1?`<details><summary>${d.warnings.length-1} more diagnostics</summary><div>${d.warnings.slice(1).map(esc).join('<br>')}</div></details>`:''}</section>`;
+  return `<section class="panel score-card" data-track="${esc(t.id)}" style="--track:${color}"><div class="panel-head"><h2>${esc(t.label)}</h2><div><button class="small-button" data-svg="${esc(t.id)}">SVG ↓</button> <span class="badge" data-now="${esc(t.id)}">—</span> <button class="small-button" data-inspect="${esc(t.id)}" ${!d?'disabled':''}>Inspect ↗</button></div></div>${d?.warnings?.length?`<div class="score-warning">${esc(d.warnings[0])}</div>`:''}<div class="score-body">${d?.parts?.length?d.parts.map((part,i)=>`<div class="score-part"><div class="voice-label">${part.voice==='Vocal'?'Predicted vocal voice':'Predicted instrumental voice'}</div><div class="score-scroll"><div class="score" id="score-${esc(t.id)}-${i}"></div></div></div>`).join(''):`<div class="score-empty">${esc(t.error||(d?.notes?.length?'No synchronized staff could be built. Raw notes and exports are available under Inspect.':t.status==='queued'||t.status==='running'?'Waiting for this transcription…':'No melody score was emitted for this input.'))}</div>`}</div>${d?.warnings?.length>1?`<details><summary>${d.warnings.length-1} more diagnostics</summary><div>${d.warnings.slice(1).map(esc).join('<br>')}</div></details>`:''}</section>`;
  }).join(''):'<div class="score-empty">Select an input above to show its score.</div>';
  for(const t of tracks){const d=state.analyses.get(t.id);(d?.parts||[]).forEach((part,i)=>{
   const element=$(`score-${t.id}-${i}`);
@@ -199,6 +199,8 @@ function renderLedger(){
  if(type==='notes'){head=['Start','End','Pitch','Voice'];rows=d.notes.map(n=>({time:n[0],cells:[n[0].toFixed(3),n[1].toFixed(3),pitchName(n[2])+' / '+n[2],n[3]===0?'Vocal':'Instrumental']}));}
  else if(type==='events'){head=['Time','Subbeat','Emitted values'];rows=d.events.map(e=>({time:e.time,cells:[e.time.toFixed(3),e.global_subbeat,JSON.stringify(e.values)]}));}
  else if(type==='beats'){head=['Time','Beat','Meter'];rows=d.beats.map(b=>({time:b[0],cells:[b[0].toFixed(3),b[1],b[2]+'/'+b[3]]}));}
+ else if(type==='rhythm'){head=['Time','Rhythm'];rows=(d.rhythm||[]).map(r=>({time:r[0],cells:[r[0].toFixed(3),JSON.stringify(r[1])]}));}
+ else if(type==='measures'){head=['Bar','Start','End','Notated quarters'];rows=(d.playback?.measures||[]).map(m=>({time:m.start,cells:[m.index+1,m.start.toFixed(3),m.end.toFixed(3),((m.score_end-m.score_start)*4).toFixed(2)]}));}
  else{head=['Start','End','Label'];rows=d[type].map(r=>({time:r[0],cells:[r[0].toFixed(3),r[1].toFixed(3),r[2]]}));}
  const q=$('ledger-search').value.toLowerCase();rows=rows.filter(r=>r.cells.join(' ').toLowerCase().includes(q));state.ledgerRows=rows;
  state.page.ledger=Math.max(0,Math.min(state.page.ledger,Math.ceil(rows.length/200)-1));const start=state.page.ledger*200;
@@ -245,8 +247,10 @@ async function init(){
  $('custom-targets').onclick=e=>{const b=e.target.closest('[data-remove]');if(b){state.custom.splice(Number(b.dataset.remove),1);renderCustom();}};
  $('run').onclick=()=>startJob();$('retry').onclick=()=>startJob(true);$('cancel').onclick=async()=>{try{await api(`api/jobs/${state.job.id}/cancel`,{method:'POST'});pollJob();}catch(e){notice(e.message);}};
  $('new-session').onclick=newSession;$('history').onchange=e=>{if(e.target.value)loadJob(e.target.value);};
+ $('jump-go').onclick=()=>seek(Number($('jump').value));$('jump').onkeydown=e=>{if(e.key==='Enter')seek(Number(e.target.value));};
  $('play').onclick=()=>state.playing?pause():play();$('seek').oninput=e=>seek(e.target.value);$('volume').oninput=()=>{for(const [a,gain] of audioPlan())a.volume=gain;};$('speed').onchange=()=>state.media.forEach(a=>a.playbackRate=Number($('speed').value));$('hear').onchange=()=>{state.audition=null;changeListening();};
  document.addEventListener('click',e=>{
+  const svg=e.target.closest('[data-svg]');if(svg)downloadSvg(svg.dataset.svg);
   const tab=e.target.closest('[data-view]');if(tab)showView(tab.dataset.view);
   const inspectButton=e.target.closest('[data-inspect]');if(inspectButton)inspect(inspectButton.dataset.inspect);
   const mute=e.target.closest('[data-mute]');if(mute){const id=mute.dataset.mute;state.muted.has(id)?state.muted.delete(id):state.muted.add(id);state.audition=null;renderTracks();changeListening();}
@@ -255,6 +259,7 @@ async function init(){
   const row=e.target.closest('tr[data-time]');if(row)seek(Number(row.dataset.time));
  });
  $('track-list').onchange=e=>{const id=e.target.dataset.show;if(!id)return;e.target.checked?state.selected.add(id):state.selected.delete(id);if(state.solo===id&&!e.target.checked)state.solo=null;state.audition=null;renderScores();changeListening();};
+ $('print-scores').onclick=()=>{showView('scores');window.print();};
  $('inspect-select').onchange=e=>{state.inspect=e.target.value;state.page={ledger:0,token:0};renderInspection();};$('roll-window').onchange=()=>paint(state.time,true);
  $('ledger-type').onchange=$('ledger-search').oninput=()=>{state.page.ledger=0;renderLedger();};$('token-search').oninput=()=>{state.page.token=0;renderTokens();};
  for(const [name,fn] of [['ledger',renderLedger],['token',renderTokens]]){$(name+'-prev').onclick=()=>{state.page[name]--;fn();};$(name+'-next').onclick=()=>{state.page[name]++;fn();};}
