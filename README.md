@@ -35,7 +35,7 @@ The player provides:
 
 Scores have independently predicted beat grids. **Their bar lines can disagree even though the cursors share audio seconds.** Staff timing can differ from raw event timing because of quantization and notation repairs. Empty voices are not replaced with invented notes.
 
-If a tiny boundary note cannot fit on the predicted notation grid, the display can omit it with an explicit diagnostic, rather than losing the whole staff. Raw notes, MIDI, piano roll and synthesized playback retain it. `display-*.abc` exports match the displayed staves; `display-omitted-notes.json` records any omissions.
+If a tiny boundary note or annotation cannot fit on the predicted notation grid, the display can omit it with an explicit diagnostic, rather than losing the whole staff. Raw predictions, MIDI, piano roll and synthesized playback retain it. `display-*.abc` exports match the displayed staves; `display-omitted-*.json` records any omissions.
 
 Playback of several overlapping mixes can double sources. The UI warns about this and reduces multi-input gain. Solo inputs for direct comparisons. MP3s are listening previews; the model consumes prepared float WAV audio. Mix gains and model revision/precision are recorded in session metadata.
 

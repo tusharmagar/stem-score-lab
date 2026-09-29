@@ -47,21 +47,34 @@ def align_score(notation, folder, duration, warnings=None):
     try:
         score = n.build_rebuilt_abc_score(p/'song_melody.mid', p/'song_beats.txt', p/'song_chords.txt', p/'song_keys.txt', p/'song_structures.txt')
     except ValueError as exc:
-        if 'cannot be represented on the decoded subbeat grid' not in str(exc):
+        if not any(reason in str(exc) for reason in ('cannot be represented on the decoded subbeat grid', 'is shorter than the ABC subbeat grid')):
             raise
         import pretty_midi
         beats = n.read_beats(p/'song_beats.txt')
         measures, _ = n.infer_measures(beats, meter_conflict='infer')
         grid, _, _ = n._build_grid(beats, measures)
         midi, omitted = display_midi(pretty_midi.PrettyMIDI(str(p/'song_melody.mid')), grid)
-        if not omitted:
-            raise
-        score = n._assemble_abc_score(midi, beats, n.read_keys(p/'song_keys.txt'),
-            n.read_structures(p/'song_structures.txt'), n.read_chords(p/'song_chords.txt'),
+        omitted_intervals = []
+        def representable(rows, kind):
+            kept = []
+            for start, end, label in rows:
+                if n._quantize_time(end, grid) <= n._quantize_time(start, grid):
+                    omitted_intervals.append(dict(kind=kind, start=start, end=end, label=label))
+                else:
+                    kept.append((start, end, label))
+            return kept
+        keys = representable(n.read_keys(p/'song_keys.txt'), 'key')
+        chords = representable(n.read_chords(p/'song_chords.txt'), 'chord')
+        if not keys:
+            raise ValueError('No decoded key interval fits the score grid')
+        score = n._assemble_abc_score(midi, beats, keys,
+            n.read_structures(p/'song_structures.txt'), chords,
             meter_conflict='infer', melody_only=False)
-        write_json(Path(folder)/'display-omitted-notes.json', omitted)
-        if warnings is not None:
-            warnings.append(f'Display score omits {len(omitted)} note(s) shorter than the predicted grid can represent. Raw notes, MIDI, piano roll and synthesized playback retain them. See display-omitted-notes.json.')
+        for kind, items in [('notes', omitted), ('intervals', omitted_intervals)]:
+            if items:
+                write_json(Path(folder)/f'display-omitted-{kind}.json', items)
+                if warnings is not None:
+                    warnings.append(f'Display score omits {len(items)} {kind} shorter than the predicted grid can represent. Raw predictions and playback retain them. See display-omitted-{kind}.json.')
     unit = n.abc_unit_denominator(score)
     first = score.measures[0]
     parts = []
