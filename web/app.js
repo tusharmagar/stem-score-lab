@@ -62,7 +62,7 @@ async function pollJob(){
  clearTimeout(state.poll);if(!state.job)return;const id=state.job.id;
  try{
   const job=await api(`api/jobs/${id}`);if(state.job?.id!==id)return;state.job=job;
-  $('job-panel').hidden=false;$('job-stage').textContent=job.stage;$('job-detail').textContent=job.progress?`${job.progress.stage}${job.progress.window?' · window '+job.progress.window+'/'+job.progress.windows:''}${job.progress.tokens?' · '+job.progress.tokens+' tokens':''}`:'Completed inputs remain available if another input fails. Processing runs one input at a time.';
+  $('job-panel').hidden=job.status==='complete';$('job-stage').textContent=job.stage;$('job-detail').textContent=job.progress?`${job.progress.stage}${job.progress.window?' · window '+job.progress.window+'/'+job.progress.windows:''}${job.progress.tokens?' · '+job.progress.tokens+' tokens':''}`:'Completed inputs remain available if another input fails. Processing runs one input at a time.';
   $('job-targets').innerHTML=(job.targets||[]).map(t=>`<span class="job-chip" data-status="${esc(t.status)}">${esc(t.label)} · ${esc(t.status)}</span>`).join('');
   $('job-error').textContent=job.error||(job.targets||[]).filter(t=>t.error).map(t=>t.label+': '+t.error).join('\n');
   const running=['queued','running','cancelling'].includes(job.status);$('cancel').hidden=!running;$('cancel').disabled=job.status==='cancelling';$('retry').hidden=running||!['partial','failed','cancelled','interrupted'].includes(job.status);
@@ -113,7 +113,7 @@ function audioPlan(){
  return plan;
 }
 function updateListeningCaption(){
- const tracks=targetsForListening();$('mix-warning').hidden=!overlappingSources(tracks)||$('hear').value==='original'||Boolean(state.audition);
+ const tracks=targetsForListening();$('mix-warning').hidden=!overlappingSources(tracks)||['original','melody'].includes($('hear').value)||Boolean(state.audition);
  $('listen-caption').textContent=state.audition?`Solo audio: ${state.audition} · same excerpt clock`:$('hear').value==='original'?'Original excerpt · score selections do not change this audio':$('hear').value==='melody'?`${tracks.filter(t=>t.synth).length} predicted melodies · simple tone synthesis · fixed velocity`:$('hear').value==='overlay'?'Selected recordings + predicted melody tones · summed at reduced gain':`${tracks.length} selected inputs · solo an input for direct comparison`;
 }
 async function changeListening(){
@@ -137,7 +137,7 @@ function seek(time){if(!state.session)return;const t=Math.max(0,Math.min(state.s
 function renderTracks(){
  $('track-list').innerHTML=state.session.targets.map((t,i)=>`<div class="track-control" style="--track:${COLORS[i%COLORS.length]}"><label><input type="checkbox" data-show="${esc(t.id)}" ${state.selected.has(t.id)?'checked':''} ${!t.audio?'disabled':''}> ${esc(t.label)}</label><button data-mute="${esc(t.id)}" class="${state.muted.has(t.id)?'on':''}" aria-pressed="${state.muted.has(t.id)}">Mute</button><button data-solo="${esc(t.id)}" class="${state.solo===t.id?'on':''}" aria-pressed="${state.solo===t.id}">Solo</button><button data-inspect="${esc(t.id)}" ${!state.analyses.has(t.id)?'disabled':''}>Inspect ↗</button><div class="track-meta">${esc(t.sources.join(' + '))} · ${t.noteCount??'—'} notes · ${esc(t.status)}</div></div>`).join('');
  $('inspect-select').innerHTML=state.session.targets.filter(t=>state.analyses.has(t.id)).map(t=>`<option value="${esc(t.id)}">${esc(t.label)}</option>`).join('');if(state.inspect)$('inspect-select').value=state.inspect;
- $('stem-buttons').innerHTML=Object.keys(state.session.audio||{}).filter(x=>x!=='original').map(s=>`<button class="small-button" data-audition="${esc(s)}">${esc(s)}</button>`).join('')+'<button class="small-button" data-audition="">Return to selected inputs</button>';
+ $('stem-buttons').innerHTML=Object.keys(state.session.audio||{}).filter(x=>x!=='original').map(s=>`<span><button class="small-button" data-audition="${esc(s)}">${esc(s)}</button> <a download href="${esc(asset(state.session.audio[s]))}" aria-label="Download ${esc(s)} MP3">↓</a></span>`).join(' ')+' <button class="small-button" data-audition="">Return to selected inputs</button>';
  $('stem-audition').hidden=Object.keys(state.session.audio||{}).length<=1;updateListeningCaption();
 }
 function renderScores(){

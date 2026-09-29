@@ -93,6 +93,12 @@ node --test tests/*.test.js
 
 The notebook installs the current repository checkout in a fresh runtime; an existing checkout is preserved on rerun. To pick up code updates, use a fresh runtime or deliberately update the checkout after downloading results. The model and custom model code are pinned to revision `cafc0df1021e14f49e928c4b345f5959d414ef64`.
 
+## Validation
+
+Verified on a Colab Tesla T4 with an isolated Python 3.11 install: generated 12-second audio → four Demucs stems → five independent SheetSage2 inputs, including a custom bass + other mix → synchronized scores and exports. To repeat this execution check after launch, run `/content/stem-score-env/bin/python scripts/smoke_gpu.py` from the repository. It is not a transcription accuracy benchmark.
+
+The local suite includes 21 Python and 6 JavaScript checks for input validation, cancellation, partial-result preservation, safe exports, audio seeking, empty predictions, grid-boundary notes, source overlap and raw stream lookup. Browser checks cover multi-score playback, note highlighting, seeking, soloing and a downloaded session reopened without the inference server.
+
 ## Credits and licenses
 
 Independent community experiment; not an official YuE2 / M·A·P product.
