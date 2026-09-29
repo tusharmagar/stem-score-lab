@@ -107,7 +107,8 @@ def run(job_id):
         from transformers import AutoModel
         model=AutoModel.from_pretrained(MODEL_ID,revision=MODEL_REVISION,code_revision=MODEL_REVISION,trust_remote_code=True).eval().to('cuda')
         notation=importlib.import_module(type(model).__module__.rsplit('.',1)[0]+'.notation_sheetsage2')
-        dtype='bf16' if torch.cuda.is_bf16_supported() else 'fp32'
+        # Recent torch can report emulated bf16 on a T4; use native support only.
+        dtype='bf16' if torch.cuda.get_device_capability()[0]>=8 else 'fp32'
         manifest['model']={'id':MODEL_ID,'revision':MODEL_REVISION,'device':torch.cuda.get_device_name(),'precision':dtype,'demucs':'htdemucs / 4.0.1'}
         for i,(target,source,p) in enumerate(pending):
             target['status']='running'

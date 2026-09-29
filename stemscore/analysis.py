@@ -74,7 +74,8 @@ def align_score(notation, folder, duration, warnings=None):
             if items:
                 write_json(Path(folder)/f'display-omitted-{kind}.json', items)
                 if warnings is not None:
-                    warnings.append(f'Display score omits {len(items)} {kind} shorter than the predicted grid can represent. Raw predictions and playback retain them. See display-omitted-{kind}.json.')
+                    label = kind[:-1] if len(items)==1 else kind
+                    warnings.append(f'Display score omits {len(items)} {label} shorter than the predicted grid can represent. Raw predictions and playback retain them. See display-omitted-{kind}.json.')
     unit = n.abc_unit_denominator(score)
     first = score.measures[0]
     parts = []

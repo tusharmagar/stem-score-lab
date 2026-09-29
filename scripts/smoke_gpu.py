@@ -56,6 +56,6 @@ if result['status']!='complete':sys.exit(1)
 for target in result['targets']:
     if target.get('analysis'):
         data=request('/results/'+job['id']+'/'+target['analysis'])
-        assert 'notes' in data and 'parts' in data
+        assert data['notes'] and data['parts'], data['warnings']
         assert all(0<=e['start']<=e['end']<=duration+.001 for part in data['parts'] for e in part['timeline'])
 print('GPU PIPELINE CHECK PASSED. This checks execution, not transcription accuracy.',flush=True)
