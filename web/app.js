@@ -97,12 +97,12 @@ async function hydrate(session){
 }
 function getMedia(key,path){
  if(!state.media.has(key)){
-  const audio=new Audio(asset(path));audio.preload='metadata';audio.preservesPitch=true;audio.playbackRate=Number($('speed').value);audio.volume=0;
+  const audio=new Audio(asset(path));audio.preload='metadata';audio.preservesPitch=true;audio.playbackRate=Number($('speed').value);audio.volume=0;audio.hidden=true;audio.dataset.mediaKey=key;document.body.appendChild(audio);
   audio.addEventListener('error',()=>{if(state.playing)notice('An audio file could not be read. Pause and retry, or download the session.');});state.media.set(key,audio);
  }
  return state.media.get(key);
 }
-function disposeAudio(){for(const a of state.media.values()){a.pause();a.removeAttribute('src');a.load();}state.media.clear();state.master=null;state.time=0;}
+function disposeAudio(){for(const a of state.media.values()){a.pause();a.removeAttribute('src');a.load();a.remove();}state.media.clear();state.master=null;state.time=0;}
 function audioPlan(){
  const plan=new Map();if(!state.master)return plan;
  plan.set(state.master,0);const mode=$('hear').value;const volume=Number($('volume').value);

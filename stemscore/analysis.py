@@ -1,5 +1,6 @@
 """Adapt model exports to the UI, preserving raw files and raw timing."""
 from collections import Counter
+from copy import deepcopy
 import math
 from pathlib import Path
 import re
@@ -19,14 +20,48 @@ def lab(path, converters):
     return rows
 
 
-def align_score(notation, folder, duration):
+def display_midi(midi, grid):
+    """Omit only notes that collapse to zero grid duration, on a display copy."""
+    copy = deepcopy(midi)
+    boundaries = (np.asarray(grid[:-1]) + np.asarray(grid[1:])) / 2
+    omitted = []
+    for instrument in copy.instruments:
+        kept = []
+        for note in instrument.notes:
+            start, end = np.searchsorted(boundaries, [note.start, note.end])
+            if end <= start:
+                omitted.append(dict(voice=instrument.name, pitch=note.pitch, start=note.start, end=note.end))
+            else:
+                kept.append(note)
+        instrument.notes = kept
+    return copy, omitted
+
+
+def align_score(notation, folder, duration, warnings=None):
     """Serialize each canonical voice and map each ABC token through its beat grid.
 
     No assumption about key, pitch, meter, silent voices, tempo or pickup length.
     Canonical padding maps to zero elapsed time, never to invented audio.
     """
     n, p = notation, Path(folder) / 'notation'
-    score = n.build_rebuilt_abc_score(p/'song_melody.mid', p/'song_beats.txt', p/'song_chords.txt', p/'song_keys.txt', p/'song_structures.txt')
+    try:
+        score = n.build_rebuilt_abc_score(p/'song_melody.mid', p/'song_beats.txt', p/'song_chords.txt', p/'song_keys.txt', p/'song_structures.txt')
+    except ValueError as exc:
+        if 'cannot be represented on the decoded subbeat grid' not in str(exc):
+            raise
+        import pretty_midi
+        beats = n.read_beats(p/'song_beats.txt')
+        measures, _ = n.infer_measures(beats, meter_conflict='infer')
+        grid, _, _ = n._build_grid(beats, measures)
+        midi, omitted = display_midi(pretty_midi.PrettyMIDI(str(p/'song_melody.mid')), grid)
+        if not omitted:
+            raise
+        score = n._assemble_abc_score(midi, beats, n.read_keys(p/'song_keys.txt'),
+            n.read_structures(p/'song_structures.txt'), n.read_chords(p/'song_chords.txt'),
+            meter_conflict='infer', melody_only=False)
+        write_json(Path(folder)/'display-omitted-notes.json', omitted)
+        if warnings is not None:
+            warnings.append(f'Display score omits {len(omitted)} note(s) shorter than the predicted grid can represent. Raw notes, MIDI, piano roll and synthesized playback retain them. See display-omitted-notes.json.')
     unit = n.abc_unit_denominator(score)
     first = score.measures[0]
     parts = []
@@ -71,6 +106,7 @@ def align_score(notation, folder, duration):
             # Inline key changes update the next measure's starting key.
             key = str(score.key_arr[m.end_t-1])
         parts.append({'voice': voice, 'abc': abc+'\n', 'timeline': events})
+        (Path(folder)/f'display-{voice}.abc').write_text(abc+'\n')
     return parts
 
 
@@ -122,7 +158,7 @@ def summarize(folder, audio_path, duration, notation=None):
         data['warnings'].insert(0,'More than 90% of predicted notes have one pitch. Listen against the input before trusting this transcription.')
     if result.get('abc_error'): data['warnings'].append('Model score export: '+str(result['abc_error']))
     if notation is not None and (p/'notation/song_melody.mid').exists():
-        try: data['parts'] = align_score(notation,p,duration)
+        try: data['parts'] = align_score(notation,p,duration,data['warnings'])
         except Exception as e: data['warnings'].append('Synchronized score unavailable: '+str(e)+'. Raw ABC/MIDI remain downloadable.')
     write_json(p/'analysis.json', data)
     return data

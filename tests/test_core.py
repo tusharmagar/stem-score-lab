@@ -6,7 +6,20 @@ import numpy as np
 import soundfile as sf
 from fastapi.testclient import TestClient
 from stemscore.core import validate_config, write_json, probe, media_wav
-from stemscore.analysis import summarize, synthesize
+from stemscore.analysis import summarize, synthesize, display_midi
+
+
+def test_display_grid_recovery_preserves_raw_notes():
+    import pretty_midi
+    midi=pretty_midi.PrettyMIDI()
+    instrument=pretty_midi.Instrument(0,name='Ins')
+    # A tiny clipped tail collapses; a short note crossing a grid midpoint does not.
+    instrument.notes=[pretty_midi.Note(100,60,0,.5),pretty_midi.Note(100,64,.74,.76),pretty_midi.Note(100,79,1.99,2)]
+    midi.instruments.append(instrument)
+    shown,omitted=display_midi(midi,[0,.5,1,1.5,2])
+    assert [n.pitch for n in shown.instruments[0].notes]==[60,64]
+    assert len(midi.instruments[0].notes)==3
+    assert omitted==[{'voice':'Ins','pitch':79,'start':1.99,'end':2}]
 
 
 def config(*sources,start=0,end=10):
